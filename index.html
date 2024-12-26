@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Detector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f3f3f3;
+        }
+        .icon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .green-icon {
+            background-color: green;
+            color: white;
+            font-size: 18px;
+        }
+        .blue-icon {
+            background-color: blue;
+            color: white;
+            font-size: 18px;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #video {
+            margin-top: 20px;
+            width: 640px;
+            height: 480px;
+            border: 2px solid #ccc;
+            background-color: black;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="icon green-icon" id="detect-motion">
+        التعرف
+    </div>
+    <div class="icon blue-icon" id="extract-motion">
+        استخراج
+    </div>
+    <div style="position: relative;">
+        <video id="video" autoplay></video>
+        <canvas id="output"></canvas>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const detectMotion = document.getElementById('detect-motion');
+        const extractMotion = document.getElementById('extract-motion');
+        const canvas = document.getElementById('output');
+        const ctx = canvas.getContext('2d');
+
+        // إعداد الكاميرا لتشغيل الفيديو
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                await video.play();
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+            } catch (error) {
+                console.error('خطأ في الوصول إلى الكاميرا:', error);
+            }
+        }
+
+        // إعداد MediaPipe Pose
+        async function detectPoses() {
+            const pose = new Pose.Pose({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5,
+            });
+
+            pose.onResults((results) => {
+                drawResults(results);
+            });
+
+            const detectPoseFrame = async () => {
+                if (!video.paused && !video.ended) {
+                    await pose.send({ image: video });
+                    requestAnimationFrame(detectPoseFrame);
+                }
+            };
+
+            detectPoseFrame();
+        }
+
+        // وظيفة رسم الهيكل العظمي على الفيديو
+        function drawResults(results) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (results.poseLandmarks) {
+                results.poseLandmarks.forEach(({ x, y, visibility }) => {
+                    if (visibility > 0.5) {
+                        ctx.beginPath();
+                        ctx.arc(x * canvas.width, y * canvas.height, 5, 0, Math.PI * 2);
+                        ctx.fillStyle = "red";
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                });
+            }
+        }
+
+        // استخراج الحركات - مثال بدائي باستخدام Optical Flow
+        function extractMotionFromFrames() {
+            console.log("استخراج الحركات سيتم لاحقًا");
+        }
+
+        // تشغيل الكاميرا عند التحميل
+        setupCamera().then(() => {
+            detectMotion.addEventListener('click', detectPoses);
+            extractMotion.addEventListener('click', extractMotionFromFrames);
+        });
+    </script>
+</body>
+</html>
